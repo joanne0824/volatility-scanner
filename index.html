@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股波動度選股</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0f14;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 16px;
+  }
+  .header {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .title { font-size: 20px; font-weight: 700; color: #f06595; }
+  .subtitle { font-size: 12px; color: #666; margin-top: 4px; }
+  .update-time { font-size: 11px; color: #555; margin-top: 8px; }
+  .no-data { color: #666; text-align: center; padding: 40px; }
+
+  /* 說明區 */
+  .legend {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px; margin-bottom: 20px;
+  }
+  .legend-title {
+    font-size: 12px; font-weight: 700;
+    color: #f06595; margin-bottom: 10px;
+  }
+  .legend-grid {
+    display: grid; grid-template-columns: repeat(2,1fr); gap: 6px;
+  }
+  .legend-item { font-size: 11px; color: #888; display: flex; gap: 6px; align-items: flex-start; }
+  .ldot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .ldot-pink   { background: #f06595; }
+  .ldot-yellow { background: #ffd43b; }
+  .ldot-blue   { background: #74c0fc; }
+  .ldot-green  { background: #69db7c; }
+
+  /* 卡片 */
+  .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px; margin-bottom: 14px;
+  }
+  .card-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; margin-bottom: 12px;
+  }
+  .stock-name { font-size: 16px; font-weight: 700; color: #fff; }
+  .stock-code { font-size: 12px; color: #888; margin-top: 2px; }
+
+  /* 波動度大數字 */
+  .vol-score {
+    text-align: right;
+  }
+  .vol-number {
+    font-size: 24px; font-weight: 700;
+  }
+  .vol-label { font-size: 10px; color: #666; }
+  .vol-high { color: #f06595; }
+  .vol-mid  { color: #ffd43b; }
+  .vol-low  { color: #e0e0e0; }
+
+  /* 指標格 */
+  .metrics {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    gap: 8px; margin-bottom: 12px;
+  }
+  .metric {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 8px; text-align: center;
+  }
+  .metric-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .metric-value { font-size: 13px; font-weight: 700; }
+  .positive { color: #69db7c; }
+  .negative { color: #ff6b6b; }
+  .neutral  { color: #e0e0e0; }
+  .warning  { color: #ffd43b; }
+  .pink     { color: #f06595; }
+  .blue     { color: #74c0fc; }
+
+  /* 目標價區塊 */
+  .targets {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .targets-title {
+    font-size: 11px; color: #666;
+    letter-spacing: 1px; margin-bottom: 10px;
+  }
+  .target-row {
+    display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 8px;
+  }
+  .target-label { font-size: 11px; color: #888; }
+  .target-price { font-size: 14px; font-weight: 700; }
+  .target-pct   { font-size: 11px; color: #666; }
+  .t-init  { color: #74c0fc; }
+  .t-main  { color: #69db7c; }
+  .t-final { color: #f06595; }
+
+  /* 目標價進度條 */
+  .price-bar-wrap { margin: 10px 0; }
+  .price-bar-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: #555; margin-bottom: 4px;
+  }
+  .price-bar {
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px; height: 10px;
+    position: relative;
+  }
+  .price-bar-fill {
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, #74c0fc, #69db7c, #f06595);
+  }
+  .price-marker {
+    position: absolute; top: -3px;
+    width: 3px; height: 16px;
+    background: #fff; border-radius: 2px;
+  }
+  .target-marker {
+    position: absolute; top: 0;
+    width: 2px; height: 10px;
+    border-radius: 1px; opacity: 0.7;
+  }
+
+  /* 月KD */
+  .kd-box {
+    display: flex; gap: 8px; margin-bottom: 12px;
+  }
+  .kd-item {
+    flex: 1; background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 8px; text-align: center;
+  }
+  .kd-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .kd-value { font-size: 16px; font-weight: 700; }
+  .kd-hint  { font-size: 10px; color: #555; margin-top: 2px; }
+
+  .divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 10px 0; }
+
+  .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tag {
+    font-size: 10px; padding: 2px 8px;
+    border-radius: 6px; background: rgba(255,255,255,0.05); color: #888;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">台股波動度選股</div>
+  <div class="subtitle">歷史高點波動度 · 黃金切割率目標價 · 月KD指標</div>
+  <div class="update-time" id="update-time">載入中...</div>
+</div>
+
+<div class="legend">
+  <div class="legend-title">📊 波動度說明</div>
+  <div class="legend-grid">
+    <div class="legend-item"><div class="ldot ldot-pink"></div>波動度 = (10年最高價 - 近3月最低價) / 近3月最低價</div>
+    <div class="legend-item"><div class="ldot ldot-yellow"></div>波動度越大，未來反彈空間越大</div>
+    <div class="legend-item"><div class="ldot ldot-blue"></div>初升段目標：Vl × (1 + 波動度 × 0.38)</div>
+    <div class="legend-item"><div class="ldot ldot-green"></div>主升段目標：Vl × (1 + 波動度 × 0.618)</div>
+    <div class="legend-item"><div class="ldot ldot-pink"></div>末升段目標：Vl × (1 + 波動度 × 0.8)</div>
+    <div class="legend-item"><div class="ldot ldot-yellow"></div>月KD < 20 超賣區，布局時機</div>
+  </div>
+</div>
+
+<div id="content">
+  <div class="no-data">載入資料中...</div>
+</div>
+
+<script>
+fetch('data.json?t=' + Date.now())
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('update-time').textContent =
+      '更新時間：' + data.update_time;
+
+    const content = document.getElementById('content');
+    if (!data.stocks || data.stocks.length === 0) {
+      content.innerHTML = '<div class="no-data">今日無符合條件股票</div>';
+      return;
+    }
+
+    content.innerHTML = data.stocks.map(s => {
+      const vol      = parseFloat(s['波動度'])    || 0;
+      const vl       = parseFloat(s['近期低點'])   || 0;
+      const vh       = parseFloat(s['歷史高點'])   || 0;
+      const close    = parseFloat(s['收盤價'])     || 0;
+      const t1       = parseFloat(s['初升段目標']) || 0;
+      const t2       = parseFloat(s['主升段目標']) || 0;
+      const t3       = parseFloat(s['末升段目標']) || 0;
+      const kd_k     = parseFloat(s['月K值'])     || 0;
+      const kd_d     = parseFloat(s['月D值'])     || 0;
+      const dist_vl  = parseFloat(s['距低點%'])   || 0;
+
+      const volClass = vol >= 5 ? 'vol-high' : vol >= 3 ? 'vol-mid' : 'vol-low';
+
+      // 現價在目標價區間的位置
+      const range    = t3 - vl;
+      const pos_pct  = range > 0 ? Math.min(((close - vl) / range * 100), 100) : 0;
+      const t1_pct   = range > 0 ? ((t1 - vl) / range * 100) : 33;
+      const t2_pct   = range > 0 ? ((t2 - vl) / range * 100) : 62;
+
+      // 距各目標價%
+      const dist_t1  = t1 > 0 ? ((t1 - close) / close * 100).toFixed(1) : '—';
+      const dist_t2  = t2 > 0 ? ((t2 - close) / close * 100).toFixed(1) : '—';
+      const dist_t3  = t3 > 0 ? ((t3 - close) / close * 100).toFixed(1) : '—';
+
+      // 月KD顏色
+      const kClass = kd_k < 20 ? 'positive' : kd_k < 50 ? 'neutral' : 'warning';
+      const dClass = kd_d < 20 ? 'positive' : kd_d < 50 ? 'neutral' : 'warning';
+      const kdHint = kd_k < 20 ? '超賣區✅' : kd_k < 50 ? '中性區' : '超買區⚠️';
+
+      return `
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="stock-name">${s['名稱']}</div>
+            <div class="stock-code">${s['代碼']}</div>
+          </div>
+          <div class="vol-score">
+            <div class="vol-number ${volClass}">${vol.toFixed(1)}x</div>
+            <div class="vol-label">波動度</div>
+          </div>
+        </div>
+
+        <!-- 指標格 -->
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-label">現價</div>
+            <div class="metric-value neutral">${close}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">距近期低點</div>
+            <div class="metric-value ${dist_vl>=0?'positive':'negative'}">
+              +${dist_vl}%
+            </div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">歷史高點</div>
+            <div class="metric-value pink">${vh}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">近期低點(Vl)</div>
+            <div class="metric-value blue">${vl}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">高低點期間</div>
+            <div class="metric-value neutral">${s['高點年份']||'—'}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">月均量</div>
+            <div class="metric-value neutral">${Math.round(s['月均量張']||0)}張</div>
+          </div>
+        </div>
+
+        <!-- 目標價 -->
+        <div class="targets">
+          <div class="targets-title">黃金切割率目標價</div>
+
+          <div class="price-bar-wrap">
+            <div class="price-bar-labels">
+              <span>Vl ${vl}</span>
+              <span>現價 ${close}</span>
+              <span>末升 ${t3}</span>
+            </div>
+            <div class="price-bar">
+              <div class="price-bar-fill" style="width:100%"></div>
+              <div class="target-marker" style="left:${t1_pct}%;background:#74c0fc"></div>
+              <div class="target-marker" style="left:${t2_pct}%;background:#69db7c"></div>
+              <div class="price-marker"  style="left:calc(${Math.min(pos_pct,99)}% - 1px)"></div>
+            </div>
+          </div>
+
+          <div class="target-row">
+            <span class="target-label">初升段（×0.38）</span>
+            <span class="target-price t-init">${t1}</span>
+            <span class="target-pct">+${dist_t1}%</span>
+          </div>
+          <div class="target-row">
+            <span class="target-label">主升段（×0.618）</span>
+            <span class="target-price t-main">${t2}</span>
+            <span class="target-pct">+${dist_t2}%</span>
+          </div>
+          <div class="target-row">
+            <span class="target-label">末升段（×0.8）</span>
+            <span class="target-price t-final">${t3}</span>
+            <span class="target-pct">+${dist_t3}%</span>
+          </div>
+        </div>
+
+        <!-- 月KD -->
+        <div class="kd-box">
+          <div class="kd-item">
+            <div class="kd-label">月K值</div>
+            <div class="kd-value ${kClass}">${kd_k.toFixed(1)}</div>
+            <div class="kd-hint">${kdHint}</div>
+          </div>
+          <div class="kd-item">
+            <div class="kd-label">月D值</div>
+            <div class="kd-value ${dClass}">${kd_d.toFixed(1)}</div>
+          </div>
+          <div class="kd-item">
+            <div class="kd-label">KD金叉</div>
+            <div class="kd-value ${kd_k>kd_d?'positive':'negative'}">
+              ${kd_k>kd_d?'✅ 是':'❌ 否'}
+            </div>
+          </div>
+        </div>
+
+        <div class="tag-row">
+          <span class="tag">波動度 ${vol.toFixed(2)}</span>
+          <span class="tag">Vh ${vh}</span>
+          <span class="tag">Vl ${vl}</span>
+          <span class="tag">低點月份 ${s['低點月份']||'—'}</span>
+        </div>
+      </div>`;
+    }).join('');
+  })
+  .catch(() => {
+    document.getElementById('update-time').textContent = '尚無資料';
+    document.getElementById('content').innerHTML =
+      '<div class="no-data">尚未有今日資料，請稍後再試</div>';
+  });
+</script>
+</body>
+</html>
