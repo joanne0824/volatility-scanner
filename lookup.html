@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>波動度查詢</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0f14;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .header {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .title { font-size: 20px; font-weight: 700; color: #f06595; }
+  .subtitle { font-size: 12px; color: #666; margin-top: 4px; }
+
+  /* 輸入區 */
+  .input-row {
+    display: flex; gap: 8px; margin-bottom: 20px;
+  }
+  .input-box {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 18px;
+    color: #fff;
+    outline: none;
+    letter-spacing: 2px;
+  }
+  .input-box::placeholder { color: #444; font-size: 14px; letter-spacing: 0; }
+  .input-box:focus { border-color: #f06595; }
+  .btn {
+    background: #f06595;
+    border: none; border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 14px; font-weight: 700;
+    color: #fff; cursor: pointer;
+  }
+  .btn:active { opacity: 0.8; }
+  .btn:disabled { background: #444; cursor: not-allowed; }
+
+  /* 載入中 */
+  .loading {
+    text-align: center; padding: 30px;
+    color: #666; font-size: 14px;
+  }
+  .no-data { color: #666; text-align: center; padding: 30px; }
+
+  /* 結果卡片 */
+  .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px; margin-bottom: 14px;
+  }
+  .card-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; margin-bottom: 16px;
+  }
+  .stock-name { font-size: 18px; font-weight: 700; color: #fff; }
+  .stock-code { font-size: 12px; color: #888; margin-top: 2px; }
+  .vol-number { font-size: 28px; font-weight: 700; color: #f06595; }
+  .vol-label  { font-size: 10px; color: #666; text-align: right; }
+
+  /* 指標格 */
+  .metrics {
+    display: grid; grid-template-columns: repeat(2,1fr);
+    gap: 8px; margin-bottom: 14px;
+  }
+  .metric {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 10px; text-align: center;
+  }
+  .metric-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .metric-value { font-size: 15px; font-weight: 700; }
+  .positive { color: #69db7c; }
+  .negative { color: #ff6b6b; }
+  .neutral  { color: #e0e0e0; }
+  .warning  { color: #ffd43b; }
+  .pink     { color: #f06595; }
+  .blue     { color: #74c0fc; }
+
+  /* 目標價 */
+  .targets {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .targets-title {
+    font-size: 11px; color: #666;
+    letter-spacing: 1px; margin-bottom: 10px;
+  }
+  .target-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .target-row:last-child { border-bottom: none; }
+  .target-label { font-size: 12px; color: #888; }
+  .target-price { font-size: 16px; font-weight: 700; }
+  .target-pct   { font-size: 11px; color: #555; }
+  .t-init  { color: #74c0fc; }
+  .t-main  { color: #69db7c; }
+  .t-final { color: #f06595; }
+
+  /* 進度條 */
+  .bar-wrap { margin: 12px 0; }
+  .bar-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: #555; margin-bottom: 4px;
+  }
+  .bar-track {
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px; height: 10px;
+    position: relative; overflow: visible;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, #74c0fc55, #69db7c55, #f0659555);
+    width: 100%;
+  }
+  .bar-marker {
+    position: absolute; top: -3px;
+    width: 4px; height: 16px;
+    background: #fff; border-radius: 2px;
+  }
+  .bar-target {
+    position: absolute; top: 0;
+    width: 2px; height: 10px;
+    border-radius: 1px;
+  }
+
+  /* 月KD */
+  .kd-row {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .kd-item {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 10px; text-align: center;
+  }
+  .kd-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .kd-value { font-size: 18px; font-weight: 700; }
+  .kd-hint  { font-size: 10px; color: #555; margin-top: 2px; }
+
+  .divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 12px 0; }
+
+  .error-box {
+    background: rgba(255,100,100,0.08);
+    border: 1px solid rgba(255,100,100,0.2);
+    border-radius: 10px; padding: 14px;
+    color: #ff6b6b; font-size: 13px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">波動度查詢</div>
+  <div class="subtitle">輸入股票代碼，查詢波動度與目標價</div>
+</div>
+
+<div class="input-row">
+  <input class="input-box" id="ticker-input"
+         type="text" placeholder="輸入股票代碼，如 2330"
+         maxlength="6" inputmode="numeric">
+  <button class="btn" id="search-btn" onclick="search()">查詢</button>
+</div>
+
+<div id="result"></div>
+
+<script>
+const TOKEN   = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiam9hbm5lMDgyNCIsImVtYWlsIjoiam9hbm5lYW5hbnB0QGdtYWlsLmNvbSIsInRva2VuX3ZlcnNpb24iOjB9.pYqMDGyadkM8XMdXdqf6gNSUIlpEUq3iR80_O3qJhHQ";
+const BASE    = "https://api.finmindtrade.com/api/v4/data";
+const HIST_YR = 10;
+const VL_DAYS = 90;
+
+// Enter鍵觸發
+document.getElementById('ticker-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') search();
+});
+
+async function fetchData(dataset, stock_id, start_date) {
+  const today = new Date().toISOString().slice(0,10);
+  const url   = `${BASE}?dataset=${dataset}&data_id=${stock_id}&start_date=${start_date}&end_date=${today}&token=${TOKEN}`;
+  const r     = await fetch(url);
+  const j     = await r.json();
+  if (j.status !== 200) throw new Error(j.msg || '資料抓取失敗');
+  return j.data || [];
+}
+
+function calcKD(monthly, n=9) {
+  const rsv = monthly.map((m, i) => {
+    const start = Math.max(0, i - n + 1);
+    const slice = monthly.slice(start, i+1);
+    const hmax  = Math.max(...slice.map(x => x.high));
+    const lmin  = Math.min(...slice.map(x => x.low));
+    return hmax > lmin ? (m.close - lmin) / (hmax - lmin) * 100 : 50;
+  });
+
+  let k = 50, d = 50;
+  rsv.forEach(r => {
+    k = k * 2/3 + r / 3;
+    d = d * 2/3 + k / 3;
+  });
+  return { k: Math.round(k*10)/10, d: Math.round(d*10)/10 };
+}
+
+async function search() {
+  const ticker = document.getElementById('ticker-input').value.trim();
+  if (!ticker) return;
+
+  const btn    = document.getElementById('search-btn');
+  const result = document.getElementById('result');
+  btn.disabled = true;
+  btn.textContent = '查詢中...';
+  result.innerHTML = '<div class="loading">資料載入中...</div>';
+
+  try {
+    const today    = new Date();
+    const histStart = new Date(today);
+    histStart.setFullYear(today.getFullYear() - HIST_YR);
+    const vlStart  = new Date(today);
+    vlStart.setDate(today.getDate() - VL_DAYS);
+
+    const histStr = histStart.toISOString().slice(0,10);
+    const vlStr   = vlStart.toISOString().slice(0,10);
+
+    // 抓還原股價
+    const raw = await fetchData("TaiwanStockPriceAdj", ticker, histStr);
+    if (!raw.length) throw new Error('查無此股票資料');
+
+    // 解析
+    const data = raw.map(r => ({
+      date:  r.date,
+      close: parseFloat(r.close),
+      high:  parseFloat(r.max),
+      low:   parseFloat(r.min),
+      vol:   parseFloat(r.Trading_Volume || r.volume || 0) / 1000,
+    })).sort((a,b) => a.date.localeCompare(b.date));
+
+    // 歷史最高
+    let vh = 0, vh_date = '';
+    data.forEach(d => {
+      if (d.high > vh) { vh = d.high; vh_date = d.date; }
+    });
+
+    // 近3個月最低
+    const recent = data.filter(d => d.date >= vlStr);
+    if (!recent.length) throw new Error('近期無資料');
+    let vl = Infinity, vl_date = '';
+    recent.forEach(d => {
+      if (d.low < vl) { vl = d.low; vl_date = d.date; }
+    });
+
+    const close_now = data[data.length-1].close;
+    const vol20     = data.slice(-20).reduce((s,d) => s+d.vol, 0) / 20;
+    const vol_ratio = (vh - vl) / vl;
+    const dist_vl   = (close_now - vl) / vl * 100;
+
+    const t1 = (vl * (1 + vol_ratio * 0.38)).toFixed(1);
+    const t2 = (vl * (1 + vol_ratio * 0.618)).toFixed(1);
+    const t3 = (vl * (1 + vol_ratio * 0.8)).toFixed(1);
+
+    const dist_t1 = ((t1 - close_now) / close_now * 100).toFixed(1);
+    const dist_t2 = ((t2 - close_now) / close_now * 100).toFixed(1);
+    const dist_t3 = ((t3 - close_now) / close_now * 100).toFixed(1);
+
+    // 合成月線
+    const monthly_map = {};
+    data.forEach(d => {
+      const ym = d.date.slice(0,7);
+      if (!monthly_map[ym]) monthly_map[ym] = { high:-Infinity, low:Infinity, close:0 };
+      if (d.high > monthly_map[ym].high) monthly_map[ym].high = d.high;
+      if (d.low  < monthly_map[ym].low)  monthly_map[ym].low  = d.low;
+      monthly_map[ym].close = d.close;
+    });
+    const monthly = Object.values(monthly_map);
+    const { k, d: kd_d } = monthly.length >= 9 ? calcKD(monthly) : { k: 50, d: 50 };
+
+    const kClass = k < 20 ? 'positive' : k < 50 ? 'neutral' : 'warning';
+    const dClass = kd_d < 20 ? 'positive' : kd_d < 50 ? 'neutral' : 'warning';
+    const kdHint = k < 20 ? '超賣區✅' : k < 50 ? '中性區' : '超買區⚠️';
+
+    // 進度條位置
+    const range   = parseFloat(t3) - vl;
+    const pos_pct = range > 0 ? Math.min((close_now - vl) / range * 100, 100) : 0;
+    const t1_pct  = range > 0 ? (parseFloat(t1) - vl) / range * 100 : 33;
+    const t2_pct  = range > 0 ? (parseFloat(t2) - vl) / range * 100 : 62;
+
+    const volClass = vol_ratio >= 5 ? 'pink' : vol_ratio >= 3 ? 'warning' : 'neutral';
+
+    result.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="stock-name">${ticker}</div>
+          <div class="stock-code">現價 ${close_now}</div>
+        </div>
+        <div>
+          <div class="vol-number ${volClass}">${vol_ratio.toFixed(2)}x</div>
+          <div class="vol-label">波動度</div>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">歷史最高（Vh）</div>
+          <div class="metric-value pink">${vh.toFixed(1)}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px">${vh_date.slice(0,7)}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">近期最低（Vl）</div>
+          <div class="metric-value blue">${vl.toFixed(1)}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px">${vl_date.slice(0,7)}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">現價距低點</div>
+          <div class="metric-value ${dist_vl>=0?'positive':'negative'}">
+            +${dist_vl.toFixed(1)}%
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">月均量</div>
+          <div class="metric-value neutral">${Math.round(vol20)}張</div>
+        </div>
+      </div>
+
+      <div class="targets">
+        <div class="targets-title">黃金切割率目標價</div>
+        <div class="bar-wrap">
+          <div class="bar-labels">
+            <span>Vl ${vl.toFixed(1)}</span>
+            <span>現價 ${close_now}</span>
+            <span>末升 ${t3}</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill"></div>
+            <div class="bar-target" style="left:${t1_pct}%;background:#74c0fc"></div>
+            <div class="bar-target" style="left:${t2_pct}%;background:#69db7c"></div>
+            <div class="bar-marker" style="left:calc(${Math.min(pos_pct,98)}% - 2px)"></div>
+          </div>
+        </div>
+        <div class="target-row">
+          <span class="target-label">初升段（×0.38）</span>
+          <span class="target-price t-init">${t1}</span>
+          <span class="target-pct">+${dist_t1}%</span>
+        </div>
+        <div class="target-row">
+          <span class="target-label">主升段（×0.618）</span>
+          <span class="target-price t-main">${t2}</span>
+          <span class="target-pct">+${dist_t2}%</span>
+        </div>
+        <div class="target-row">
+          <span class="target-label">末升段（×0.8）</span>
+          <span class="target-price t-final">${t3}</span>
+          <span class="target-pct">+${dist_t3}%</span>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="kd-row">
+        <div class="kd-item">
+          <div class="kd-label">月K值</div>
+          <div class="kd-value ${kClass}">${k}</div>
+          <div class="kd-hint">${kdHint}</div>
+        </div>
+        <div class="kd-item">
+          <div class="kd-label">月D值</div>
+          <div class="kd-value ${dClass}">${kd_d}</div>
+        </div>
+        <div class="kd-item">
+          <div class="kd-label">KD金叉</div>
+          <div class="kd-value ${k>kd_d?'positive':'negative'}">
+            ${k>kd_d?'✅ 是':'❌ 否'}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  } catch(e) {
+    result.innerHTML = `<div class="error-box">❌ ${e.message || '查詢失敗，請確認股票代碼'}</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '查詢';
+}
+</script>
+</body>
+</html>
